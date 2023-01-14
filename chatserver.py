@@ -24,8 +24,8 @@ class ChatBotThread(Thread):
     def run(self):
         while True:
             sleep(0.1) #25ms
-            print("Bot message queue: {}".format(len(self.messages)))
-            print("Bot thread length: {}".format(len(self.threads)))
+            #print("Bot message queue: {}".format(len(self.messages)))
+            #print("Bot thread length: {}".format(len(self.threads)))
             if len(self.messages) > 0:
                 for thread in self.threads:
                     for data in self.messages:
