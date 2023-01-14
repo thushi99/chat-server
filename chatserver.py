@@ -21,7 +21,7 @@ class ChatBotThread(Thread):
 
     def run(self):
         while True:
-            time.sleep(0.025) #25ms
+            sleep(0.025) #25ms
             if len(self.messages) > 0:
                 for thread in self.threads:
                     for data in self.messages:
@@ -38,17 +38,20 @@ class ChatServerOutgoingThread(Thread):
         self.messages = []
         self.can_kill = False
 
-    def sendMessage(self):
-        fMessage = "{username}: {message}".format(username = self.incoming_thread.getUsername(), message = message)
+    def sendMessage(self, user, message):
+        fMessage = "{username}: {message}".format(username = user, message = message)
         try:
             conn = self.conn.incoming_thread.getConnection()
             conn.sendall(fMessage.encode())
+            conn.flush()
         except:
             bot.removeChatThread(self.incoming_thread)
             self.killThread()
 
-    def queueMessage(self, message):
-        self.messages.append(message)
+    def queueMessage(self, user, message):
+        data = (user, message)
+        self.messages.append(data)
+        print("[queue_message] {}:{} ".format(user, message))
 
     def killThread(self, should_inform = False):
         self.can_kill = True
@@ -62,7 +65,8 @@ class ChatServerOutgoingThread(Thread):
             if len(self.messages) > 0:
                 for message in self.messages:
                     try:
-                        self.sendMessage(message)
+                        print("[send_message] {}:{}".format(message[0], message[1]))
+                        self.sendMessage(message[0], message[1])
                     except:
                         #inform others that the client has disconnected
                         break
@@ -75,7 +79,7 @@ class ChatServerIncomingThread(Thread):
         self.username = ""
         self.user_ip = addr[0]
         self.user_port = addr[1]
-        self.incoming_thread = None
+        self.outgoing_thread = None
         self.can_kill = False
 
     def setUsername(self,username):
@@ -91,20 +95,39 @@ class ChatServerIncomingThread(Thread):
         return self.conn._closed
 
     def initSendMessageThread(self):
-        self.incoming_thread = ChatServerOutgoingThread(self)
+        self.outgoing_thread = ChatServerOutgoingThread(self)
+        self.outgoing_thread.start()
 
     def sendMessage(self, message):
-        self.incoming_thread.queueMessage(message)
+        self.outgoing_thread.queueMessage(self.getUsername(), message)
+
+    def broadcastMessage(self, message):
+        self.outgoing_thread.queueMessage("Server Bot", message)
 
     def killThread(self):
         bot.removeChatThread(self) 
         self.can_kill = True
 
     def run(self):
+        self.initSendMessageThread()
+        sleep(0.2)
+        self.broadcastMessage("Welcome to Group Chat Server...\n\n")
+        self.broadcastMessage("You are connected from {}:{} \n".format(self.user_ip, self.user_port ))
+        self.broadcastMessage("Please enter your name to continue: ")
+        data = self.conn.recv(1024)
+        if not data:
+            self.outgoing_thread.killThread()
+            self.killThread()
+            return
+        else:
+            self.setUsername(data.decode())
+            
+        self.broadcastMessage("You can now chat with out group...\n\n > ")
         while self.conn._closed:
             data = self.conn.recv(1024)
             if not data:
-                self.incoming_thread.killThread()
+                self.outgoing_thread.killThread()
+                self.killThread()
                 break
             if data.decode().strip() == "kill":
                 self.killThread()
@@ -116,6 +139,7 @@ HOST = ''
 PORT = 9988
 
 bot = ChatBotThread()
+bot.start()
 
 binding = (HOST, PORT)
 
