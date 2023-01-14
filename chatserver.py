@@ -10,6 +10,7 @@ class ChatBotThread(Thread):
 
     def addChatThread(self, thread):
         self.threads.append(thread)
+        thread.start()
 
     def removeChatThread(self, thread):
         if thread in self.threads:
@@ -22,7 +23,7 @@ class ChatBotThread(Thread):
 
     def run(self):
         while True:
-            sleep(0.025) #25ms
+            sleep(0.1) #25ms
             print("Bot message queue: {}".format(len(self.messages)))
             print("Bot thread length: {}".format(len(self.threads)))
             if len(self.messages) > 0:
@@ -156,7 +157,6 @@ sock.listen()
 while not sock._closed:
     conn, addr = sock.accept()
     t = ChatServerIncomingThread(conn, addr)
-    t.start()
     bot.addChatThread(t)
 
 if not sock._closed:
